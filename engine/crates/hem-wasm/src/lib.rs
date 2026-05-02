@@ -2,6 +2,7 @@ use std::io::{Cursor, Write};
 use std::sync::{Arc, Mutex};
 
 use hem::output::Output;
+use hem::read_weather_file::weather_data_to_vec;
 use hem::{run_project, ProjectFlags};
 use wasm_bindgen::prelude::*;
 
@@ -18,11 +19,28 @@ pub fn hem_version() -> String {
 
 #[wasm_bindgen]
 pub fn run(input_json: &str) -> Result<String, JsError> {
+    run_internal(input_json, None)
+}
+
+#[wasm_bindgen]
+pub fn run_with_epw(input_json: &str, epw_text: &str) -> Result<String, JsError> {
+    run_internal(input_json, Some(epw_text))
+}
+
+fn run_internal(input_json: &str, epw_text: Option<&str>) -> Result<String, JsError> {
+    let weather = match epw_text {
+        Some(text) => Some(
+            weather_data_to_vec(Cursor::new(text.as_bytes().to_vec()))
+                .map_err(|e| JsError::new(&format!("EPW parse failed: {e}")))?,
+        ),
+        None => None,
+    };
+
     let input = Cursor::new(input_json.as_bytes().to_vec());
     let output = MemOutput::default();
     let flags = ProjectFlags::empty();
 
-    let response = run_project(input, &output, None, None, &flags)
+    let response = run_project(input, &output, weather, None, &flags)
         .map_err(|e| JsError::new(&format!("HEM run failed: {e:?}")))?;
 
     let payload = serde_json::json!({

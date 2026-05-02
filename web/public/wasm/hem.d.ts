@@ -7,6 +7,8 @@ export function init(): void;
 
 export function run(input_json: string): string;
 
+export function run_with_epw(input_json: string, epw_text: string): string;
+
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
@@ -14,6 +16,7 @@ export interface InitOutput {
     readonly hem_version: (a: number) => void;
     readonly init: () => void;
     readonly run: (a: number, b: number, c: number) => void;
+    readonly run_with_epw: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly __wbindgen_export: (a: number, b: number, c: number) => void;
     readonly __wbindgen_export2: (a: number) => void;
     readonly __wbindgen_export3: (a: number, b: number) => number;
