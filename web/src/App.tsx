@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
 import { hemVersion, runHem } from "./lib/hem";
 import { deleteRun, listRuns, renameRun, saveRun, type Run } from "./lib/db";
+import {
+  applyForm,
+  DEFAULT_FORM,
+  type ParametricForm,
+} from "./lib/forms/parametricDemo";
+import { getDemoTemplate } from "./lib/forms/template";
+import { CaptureForm } from "./components/CaptureForm";
 
 type RunState =
   | { kind: "idle" }
@@ -11,6 +18,8 @@ type RunState =
 export function App() {
   const [version, setVersion] = useState<string | null>(null);
   const [versionError, setVersionError] = useState<string | null>(null);
+
+  const [form, setForm] = useState<ParametricForm>(DEFAULT_FORM);
   const [input, setInput] = useState("");
   const [run, setRun] = useState<RunState>({ kind: "idle" });
   const [history, setHistory] = useState<Run[]>([]);
@@ -30,14 +39,24 @@ export function App() {
     setHistory(await listRuns());
   }
 
-  async function loadExample() {
-    setRun({ kind: "idle" });
+  async function buildFromForm() {
     setSavedFor(null);
+    setRun({ kind: "idle" });
     try {
-      const res = await fetch(`${import.meta.env.BASE_URL}examples/demo_24hrs_august.json`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const obj = (await res.json()) as unknown;
-      setInput(JSON.stringify(obj, null, 2));
+      const template = await getDemoTemplate();
+      const next = applyForm(template, form);
+      setInput(JSON.stringify(next, null, 2));
+    } catch (err) {
+      setRun({ kind: "error", message: `failed to build input: ${err}` });
+    }
+  }
+
+  async function loadRawExample() {
+    setSavedFor(null);
+    setRun({ kind: "idle" });
+    try {
+      const template = await getDemoTemplate();
+      setInput(JSON.stringify(template, null, 2));
     } catch (err) {
       setRun({ kind: "error", message: `failed to load example: ${err}` });
     }
@@ -45,7 +64,7 @@ export function App() {
 
   async function runEngine() {
     if (!input.trim()) {
-      setRun({ kind: "error", message: "input is empty" });
+      setRun({ kind: "error", message: "input is empty — click Build from form first." });
       return;
     }
     setSavedFor(null);
@@ -67,6 +86,7 @@ export function App() {
       inputJson: input,
       resultJson: run.output,
       runtimeMs: run.ms,
+      formParams: form,
     });
     setSavedFor(stored.id);
     void refreshHistory();
@@ -76,6 +96,7 @@ export function App() {
     setInput(target.inputJson);
     setRun({ kind: "ok", ms: target.runtimeMs, output: target.resultJson });
     setSavedFor(target.id);
+    if (target.formParams) setForm(target.formParams);
   }
 
   async function rename(target: Run) {
@@ -108,8 +129,11 @@ export function App() {
         </p>
       </header>
 
+      <CaptureForm value={form} onChange={setForm} />
+
       <section className="page__controls">
-        <button onClick={loadExample}>Load example input</button>
+        <button onClick={buildFromForm}>Build input from form</button>
+        <button onClick={loadRawExample}>Load example as-is</button>
         <button onClick={runEngine} disabled={!ready || run.kind === "running"}>
           {run.kind === "running" ? "Running…" : "Run engine"}
         </button>
@@ -130,7 +154,7 @@ export function App() {
           <textarea
             id="input"
             spellCheck={false}
-            placeholder="Paste HEM input JSON here, or click 'Load example input'."
+            placeholder="Click 'Build input from form' to populate this from the capture above."
             value={input}
             onChange={(e) => setInput(e.target.value)}
           />
@@ -163,6 +187,7 @@ export function App() {
                   </button>
                   <span className="history__meta">
                     {new Date(r.createdAt).toLocaleString()} · {r.runtimeMs} ms
+                    {r.formParams && " · from form"}
                   </span>
                 </div>
                 <div className="history__actions">

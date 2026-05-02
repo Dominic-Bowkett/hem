@@ -1,4 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
+import type { ParametricForm } from "./forms/parametricDemo";
 
 export type Run = {
   id: string;
@@ -7,6 +8,7 @@ export type Run = {
   resultJson: string;
   runtimeMs: number;
   createdAt: number;
+  formParams?: ParametricForm;
 };
 
 interface HemDB extends DBSchema {
@@ -18,16 +20,18 @@ interface HemDB extends DBSchema {
 }
 
 const DB_NAME = "hem";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbPromise: Promise<IDBPDatabase<HemDB>> | null = null;
 
 function getDb(): Promise<IDBPDatabase<HemDB>> {
   if (!dbPromise) {
     dbPromise = openDB<HemDB>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
-        const runs = db.createObjectStore("runs", { keyPath: "id" });
-        runs.createIndex("by-createdAt", "createdAt");
+      upgrade(db, oldVersion) {
+        if (oldVersion < 1) {
+          const runs = db.createObjectStore("runs", { keyPath: "id" });
+          runs.createIndex("by-createdAt", "createdAt");
+        }
       },
     });
   }
@@ -48,6 +52,7 @@ export async function saveRun(args: {
   resultJson: string;
   runtimeMs: number;
   name?: string;
+  formParams?: ParametricForm;
 }): Promise<Run> {
   const db = await getDb();
   const now = new Date();
@@ -58,6 +63,7 @@ export async function saveRun(args: {
     resultJson: args.resultJson,
     runtimeMs: args.runtimeMs,
     createdAt: now.getTime(),
+    formParams: args.formParams,
   };
   await db.put("runs", run);
   return run;
