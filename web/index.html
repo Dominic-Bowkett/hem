@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>HEM Engine Spike</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+      :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+      body { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
+      h1 { margin: 0 0 0.25rem 0; font-size: 1.4rem; }
+      .meta { color: #777; margin-bottom: 1rem; font-size: 0.9rem; }
+      .row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+      .col { display: flex; flex-direction: column; min-height: 50vh; }
+      label { font-weight: 600; margin-bottom: 0.25rem; }
+      textarea, pre {
+        flex: 1; font-family: ui-monospace, Menlo, Consolas, monospace;
+        font-size: 0.78rem; padding: 0.6rem; border-radius: 6px;
+        border: 1px solid #ccc; background: Canvas; color: CanvasText;
+        white-space: pre; overflow: auto;
+      }
+      pre { margin: 0; }
+      .controls { display: flex; gap: 0.6rem; align-items: center; margin: 0.6rem 0; }
+      button {
+        padding: 0.5rem 0.9rem; font-size: 0.95rem;
+        border-radius: 6px; border: 1px solid #888; cursor: pointer;
+      }
+      button[disabled] { opacity: 0.5; cursor: progress; }
+      .status { color: #555; font-size: 0.85rem; }
+      .err { color: #c00; }
+      @media (max-width: 800px) { .row { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <h1>HEM Engine Spike</h1>
+    <div class="meta">
+      Runs the open-source UK Home Energy Model engine compiled to WebAssembly,
+      entirely client-side. <span id="version"></span>
+    </div>
+
+    <div class="controls">
+      <button id="load-example">Load example input</button>
+      <button id="run" disabled>Run engine</button>
+      <span id="status" class="status">loading WASM&hellip;</span>
+    </div>
+
+    <div class="row">
+      <div class="col">
+        <label for="input">Input JSON</label>
+        <textarea id="input" spellcheck="false" placeholder="Paste HEM input JSON here, or click 'Load example input'."></textarea>
+      </div>
+      <div class="col">
+        <label for="output">Output</label>
+        <pre id="output">(no run yet)</pre>
+      </div>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,24 @@
+[package]
+name = "hem-wasm"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hem = { git = "https://github.com/communitiesuk/epb-home-energy-model.git", rev = "967de27", default-features = false }
+wasm-bindgen = "0.2"
+serde_json = "1"
+anyhow = "1"
+console_error_panic_hook = { version = "0.1", optional = true }
+getrandom = { version = "0.2", features = ["js"] }
+getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
+
+[features]
+default = ["console_error_panic_hook"]
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
+

@@ -1,0 +1,23 @@
+# Rust / Cargo
+target/
+**/target/
+*.pdb
+
+# Node / pnpm
+node_modules/
+**/node_modules/
+dist/
+.pnpm-store/
+.vite/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# Env & local
+.env
+.env.local
+*.local
