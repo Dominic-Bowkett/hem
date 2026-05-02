@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { hemVersion, runHem } from "./lib/hem";
+import { deleteRun, listRuns, renameRun, saveRun, type Run } from "./lib/db";
 
 type RunState =
   | { kind: "idle" }
@@ -12,6 +13,8 @@ export function App() {
   const [versionError, setVersionError] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [run, setRun] = useState<RunState>({ kind: "idle" });
+  const [history, setHistory] = useState<Run[]>([]);
+  const [savedFor, setSavedFor] = useState<string | null>(null);
 
   useEffect(() => {
     hemVersion()
@@ -19,8 +22,17 @@ export function App() {
       .catch((err) => setVersionError(String(err)));
   }, []);
 
+  useEffect(() => {
+    void refreshHistory();
+  }, []);
+
+  async function refreshHistory() {
+    setHistory(await listRuns());
+  }
+
   async function loadExample() {
     setRun({ kind: "idle" });
+    setSavedFor(null);
     try {
       const res = await fetch(`${import.meta.env.BASE_URL}examples/demo_24hrs_august.json`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -36,6 +48,7 @@ export function App() {
       setRun({ kind: "error", message: "input is empty" });
       return;
     }
+    setSavedFor(null);
     setRun({ kind: "running" });
     const t0 = performance.now();
     try {
@@ -43,13 +56,44 @@ export function App() {
       const ms = Math.round(performance.now() - t0);
       setRun({ kind: "ok", ms, output: JSON.stringify(result, null, 2) });
     } catch (err) {
-      const message =
-        err instanceof Error ? (err.stack ?? err.message) : String(err);
+      const message = err instanceof Error ? (err.stack ?? err.message) : String(err);
       setRun({ kind: "error", message });
     }
   }
 
+  async function saveCurrentRun() {
+    if (run.kind !== "ok") return;
+    const stored = await saveRun({
+      inputJson: input,
+      resultJson: run.output,
+      runtimeMs: run.ms,
+    });
+    setSavedFor(stored.id);
+    void refreshHistory();
+  }
+
+  function reload(target: Run) {
+    setInput(target.inputJson);
+    setRun({ kind: "ok", ms: target.runtimeMs, output: target.resultJson });
+    setSavedFor(target.id);
+  }
+
+  async function rename(target: Run) {
+    const next = window.prompt("Rename run", target.name);
+    if (next === null) return;
+    await renameRun(target.id, next);
+    void refreshHistory();
+  }
+
+  async function remove(target: Run) {
+    if (!window.confirm(`Delete "${target.name}"?`)) return;
+    await deleteRun(target.id);
+    if (savedFor === target.id) setSavedFor(null);
+    void refreshHistory();
+  }
+
   const ready = version !== null;
+  const canSave = run.kind === "ok" && savedFor === null;
 
   return (
     <main className="page">
@@ -58,7 +102,9 @@ export function App() {
         <p className="page__sub">
           Open-source UK Home Energy Model engine, running in your browser.{" "}
           {version && <span className="page__meta">(HEM {version})</span>}
-          {versionError && <span className="page__error">— failed to load WASM: {versionError}</span>}
+          {versionError && (
+            <span className="page__error"> — failed to load WASM: {versionError}</span>
+          )}
         </p>
       </header>
 
@@ -66,6 +112,9 @@ export function App() {
         <button onClick={loadExample}>Load example input</button>
         <button onClick={runEngine} disabled={!ready || run.kind === "running"}>
           {run.kind === "running" ? "Running…" : "Run engine"}
+        </button>
+        <button onClick={saveCurrentRun} disabled={!canSave}>
+          {savedFor ? "Saved ✓" : "Save run"}
         </button>
         <span className="page__status">
           {run.kind === "idle" && (ready ? "WASM ready." : "Loading WASM…")}
@@ -96,6 +145,34 @@ export function App() {
                 : "(no run yet)"}
           </pre>
         </div>
+      </section>
+
+      <section className="history">
+        <h2 className="history__title">Saved runs</h2>
+        {history.length === 0 ? (
+          <p className="history__empty">
+            No saved runs yet. Run the engine and click <em>Save run</em> to keep one.
+          </p>
+        ) : (
+          <ul className="history__list">
+            {history.map((r) => (
+              <li key={r.id} className="history__item">
+                <div className="history__main">
+                  <button className="history__name" onClick={() => reload(r)}>
+                    {r.name}
+                  </button>
+                  <span className="history__meta">
+                    {new Date(r.createdAt).toLocaleString()} · {r.runtimeMs} ms
+                  </span>
+                </div>
+                <div className="history__actions">
+                  <button onClick={() => rename(r)}>Rename</button>
+                  <button onClick={() => remove(r)}>Delete</button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </main>
   );
