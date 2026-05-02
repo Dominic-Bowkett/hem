@@ -7,7 +7,7 @@ await init({ module_or_path: wasmBytes });
 
 console.log("HEM version:", hem_version());
 
-const inputJson = await readFile(new URL("./examples/demo_24hrs_august.json", import.meta.url), "utf8");
+const inputJson = await readFile(new URL("./public/examples/demo_24hrs_august.json", import.meta.url), "utf8");
 const t0 = performance.now();
 try {
   const out = run(inputJson);

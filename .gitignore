@@ -9,6 +9,9 @@ node_modules/
 dist/
 .pnpm-store/
 .vite/
+*.tsbuildinfo
+web/vite.config.js
+web/vite.config.d.ts
 
 # OS / editor
 .DS_Store
