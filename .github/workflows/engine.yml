@@ -1,0 +1,40 @@
+name: Engine
+
+on:
+  push:
+    branches:
+      - main
+      - claude/hem-integration-planning-tCM5e
+    paths:
+      - "engine/**"
+      - "web/public/examples/**"
+      - ".github/workflows/engine.yml"
+  pull_request:
+    paths:
+      - "engine/**"
+      - "web/public/examples/**"
+      - ".github/workflows/engine.yml"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: engine
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: engine
+
+      - name: cargo check (wasm32 target)
+        run: cargo check --target wasm32-unknown-unknown -p hem-wasm
+
+      - name: cargo test (native, integration smoke)
+        run: cargo test -p hem-wasm
