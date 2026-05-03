@@ -1,10 +1,14 @@
 import type { MonthlyBucket } from "../lib/results";
 
+type SeriesSpec = { key: "gas" | "elec"; label: string; color: string };
+
 type Props = {
   data: MonthlyBucket[];
+  caption?: string;
+  series?: SeriesSpec[];
 };
 
-const SERIES: { key: "gas" | "elec"; label: string; color: string }[] = [
+const DEFAULT_SERIES: SeriesSpec[] = [
   { key: "gas", label: "Mains gas", color: "#1f6feb" },
   { key: "elec", label: "Mains elec", color: "#e5784f" },
 ];
@@ -13,27 +17,27 @@ const W = 720;
 const H = 240;
 const PAD = { top: 12, right: 12, bottom: 28, left: 44 };
 
-export function MonthlyBarsChart({ data }: Props) {
+export function MonthlyBarsChart({ data, caption, series }: Props) {
   if (data.length === 0) return null;
 
   const innerW = W - PAD.left - PAD.right;
   const innerH = H - PAD.top - PAD.bottom;
+  const seriesUsed = series ?? DEFAULT_SERIES;
 
   const maxVal = Math.max(
     1,
-    ...data.flatMap((d) => SERIES.map((s) => d[s.key])),
+    ...data.flatMap((d) => seriesUsed.map((s) => d[s.key])),
   );
   const yTicks = niceTicks(maxVal, 4);
   const yMax = yTicks[yTicks.length - 1] ?? maxVal;
 
   const groupW = innerW / data.length;
-  const barW = (groupW * 0.7) / SERIES.length;
+  const barW = (groupW * 0.7) / seriesUsed.length;
 
   return (
     <figure className="chart">
-      <figcaption className="chart__caption">Monthly energy use (kWh)</figcaption>
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Monthly gas and electricity in kWh">
-        {/* Y gridlines + labels */}
+      <figcaption className="chart__caption">{caption ?? "Monthly energy use (kWh)"}</figcaption>
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={caption ?? "Monthly energy use"}>
         {yTicks.map((t) => {
           const y = PAD.top + innerH * (1 - t / yMax);
           return (
@@ -45,12 +49,11 @@ export function MonthlyBarsChart({ data }: Props) {
             </g>
           );
         })}
-        {/* Bars */}
         {data.map((d, i) => {
           const groupX = PAD.left + i * groupW;
           return (
             <g key={d.idx}>
-              {SERIES.map((s, si) => {
+              {seriesUsed.map((s, si) => {
                 const v = Math.max(0, d[s.key]);
                 const h = innerH * (v / yMax);
                 const x = groupX + groupW * 0.15 + si * barW;
@@ -82,7 +85,7 @@ export function MonthlyBarsChart({ data }: Props) {
         })}
       </svg>
       <div className="chart__legend">
-        {SERIES.map((s) => (
+        {seriesUsed.map((s) => (
           <span key={s.key} className="chart__legend-item">
             <span className="chart__swatch" style={{ background: s.color }} />
             {s.label}

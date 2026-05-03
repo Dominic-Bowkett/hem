@@ -7,6 +7,7 @@ import { loadTemplate } from "../lib/forms/template";
 import { summariseDetailed, summariseResults, type DetailedSummary, type HemPayload, type ResultsSummary } from "../lib/results";
 import { CaptureForm } from "../components/CaptureForm";
 import { ResultsSummaryView } from "../components/ResultsSummary";
+import { Compare } from "../components/Compare";
 
 type RunState =
   | { kind: "idle" }
@@ -55,6 +56,7 @@ export function Engine() {
   const [run, setRun] = useState<RunState>({ kind: "idle" });
   const [history, setHistory] = useState<Run[]>([]);
   const [savedFor, setSavedFor] = useState<string | null>(null);
+  const [compareIds, setCompareIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     hemVersion()
@@ -215,8 +217,39 @@ export function Engine() {
     if (!window.confirm(`Delete "${target.name}"?`)) return;
     await deleteRun(target.id);
     if (savedFor === target.id) setSavedFor(null);
+    setCompareIds((s) => {
+      if (!s.has(target.id)) return s;
+      const n = new Set(s);
+      n.delete(target.id);
+      return n;
+    });
     void refreshHistory();
   }
+
+  function toggleCompare(id: string) {
+    setCompareIds((s) => {
+      const n = new Set(s);
+      if (n.has(id)) {
+        n.delete(id);
+      } else {
+        // Cap the comparison at 2 runs; remove the oldest selection if needed.
+        if (n.size >= 2) {
+          const first = n.values().next().value;
+          if (first) n.delete(first);
+        }
+        n.add(id);
+      }
+      return n;
+    });
+  }
+
+  const comparePair = useMemo<[Run, Run] | null>(() => {
+    if (compareIds.size !== 2) return null;
+    const ids = [...compareIds];
+    const a = history.find((r) => r.id === ids[0]);
+    const b = history.find((r) => r.id === ids[1]);
+    return a && b ? [a, b] : null;
+  }, [compareIds, history]);
 
   const ready = version !== null;
   const canSave = run.kind === "ok" && savedFor === null;
@@ -320,8 +353,17 @@ export function Engine() {
           <ul className="history__list">
             {history.map((r) => {
               const a = r.archetypeId ? findArchetype(r.archetypeId) : undefined;
+              const checked = compareIds.has(r.id);
               return (
                 <li key={r.id} className="history__item">
+                  <input
+                    type="checkbox"
+                    className="history__check"
+                    checked={checked}
+                    onChange={() => toggleCompare(r.id)}
+                    aria-label={`Compare ${r.name}`}
+                    title="Tick two runs to compare them below"
+                  />
                   <div className="history__main">
                     <button className="history__name" onClick={() => reload(r)}>
                       {r.name}
@@ -340,7 +382,16 @@ export function Engine() {
             })}
           </ul>
         )}
+        {history.length > 1 && compareIds.size < 2 && (
+          <p className="history__hint">
+            Tick two runs to compare their headline numbers and monthly gas use.
+          </p>
+        )}
       </section>
+
+      {comparePair && (
+        <Compare a={comparePair[0]} b={comparePair[1]} onClear={() => setCompareIds(new Set())} />
+      )}
     </>
   );
 }

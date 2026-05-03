@@ -200,6 +200,110 @@ pre {
   font-size: 0.85rem;
 }
 
+.history__check {
+  margin: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.history__hint {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin: 0.5rem 0 0 0;
+}
+
+.compare {
+  margin-top: 1.5rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.compare__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.6rem;
+}
+
+.compare__title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.compare__clear {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8rem;
+}
+
+.compare__meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.compare__col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.55rem 0.7rem;
+  background: rgba(31, 111, 235, 0.04);
+  border-radius: 6px;
+}
+
+.compare__col-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.05em;
+}
+
+.compare__col-arch {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.compare__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+}
+
+.compare__table th,
+.compare__table td {
+  padding: 0.4rem 0.55rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.compare__table thead th {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  border-bottom: 2px solid var(--border);
+}
+
+.compare__table tbody th {
+  font-weight: 500;
+}
+
+.compare__delta--improve {
+  color: #1c7c45;
+  font-weight: 600;
+}
+
+.compare__delta--worsen {
+  color: var(--error);
+  font-weight: 600;
+}
+
+.compare__delta--neutral {
+  color: var(--muted);
+}
+
 .archetype-picker {
   margin: 0.5rem 0 1rem 0;
 }
