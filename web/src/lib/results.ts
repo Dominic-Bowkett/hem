@@ -61,6 +61,7 @@ export function summariseResults(payload: HemPayload): ResultsSummary | null {
     "°C",
   );
   pushUnmetHours(stats, rows, headers, "_unmet_demand: zone 1");
+  pushCost(stats, rows, headers);
 
   return { rows: rows.length, stats };
 }
@@ -160,6 +161,90 @@ function pushUnmetHours(
     value: `${hours} / ${rows.length}`,
     hint: `Timesteps where "${column}" was non-zero.`,
   });
+}
+
+// Ofgem default tariff cap (April 2025, England average dual fuel direct-debit
+// and roughly representative; standing charges vary by region). Hard-coded for
+// the spike — a settings panel for unit + standing charges is the obvious
+// follow-up. All values are pence so we keep integer arithmetic until the
+// final pound conversion.
+const TARIFF = {
+  gasUnit_p_per_kWh: 6.34,
+  gasStanding_p_per_day: 32,
+  elecUnit_p_per_kWh: 27.03,
+  elecStanding_p_per_day: 53.8,
+};
+
+function pushCost(out: ResultStat[], rows: Row[], headers: string[]) {
+  const gasIdx = "mains gas: total";
+  const elecIdx = "mains elec: total";
+  const hasGas = headers.includes(gasIdx);
+  const hasElec = headers.includes(elecIdx);
+  if (!hasGas && !hasElec) return;
+
+  let gasKwh = 0;
+  let elecKwh = 0;
+  for (const row of rows) {
+    if (hasGas) {
+      const v = row[gasIdx];
+      if (typeof v === "number") gasKwh += v;
+    }
+    if (hasElec) {
+      const v = row[elecIdx];
+      if (typeof v === "number") elecKwh += v;
+    }
+  }
+
+  const days = Math.max(1, rows.length / 24);
+  const gasCostP = gasKwh * TARIFF.gasUnit_p_per_kWh + days * TARIFF.gasStanding_p_per_day;
+  const elecCostP =
+    elecKwh * TARIFF.elecUnit_p_per_kWh + days * TARIFF.elecStanding_p_per_day;
+  const totalCostP = (hasGas ? gasCostP : 0) + (hasElec ? elecCostP : 0);
+
+  const periodLabel = formatPeriod(rows.length);
+  const hint =
+    `Tariff: gas ${TARIFF.gasUnit_p_per_kWh.toFixed(2)} p/kWh + ` +
+    `${TARIFF.gasStanding_p_per_day.toFixed(0)} p/day standing; elec ` +
+    `${TARIFF.elecUnit_p_per_kWh.toFixed(2)} p/kWh + ` +
+    `${TARIFF.elecStanding_p_per_day.toFixed(1)} p/day standing. ` +
+    `Hard-coded Ofgem cap (Apr 2025); not a quote.`;
+
+  if (hasGas && hasElec) {
+    out.push({
+      label: `Total cost (${periodLabel})`,
+      value: formatPounds(totalCostP),
+      hint,
+    });
+    out.push({
+      label: `Gas cost`,
+      value: formatPounds(gasCostP),
+      hint: `${gasKwh.toFixed(0)} kWh × ${TARIFF.gasUnit_p_per_kWh} p + ${days.toFixed(0)} days × ${TARIFF.gasStanding_p_per_day} p standing.`,
+    });
+    out.push({
+      label: `Elec cost`,
+      value: formatPounds(elecCostP),
+      hint: `${elecKwh.toFixed(0)} kWh × ${TARIFF.elecUnit_p_per_kWh} p + ${days.toFixed(0)} days × ${TARIFF.elecStanding_p_per_day} p standing.`,
+    });
+  } else if (hasGas) {
+    out.push({ label: `Gas cost (${periodLabel})`, value: formatPounds(gasCostP), hint });
+  } else {
+    out.push({ label: `Elec cost (${periodLabel})`, value: formatPounds(elecCostP), hint });
+  }
+}
+
+function formatPounds(pence: number): string {
+  const pounds = pence / 100;
+  if (pounds >= 1000) return `£${pounds.toFixed(0)}`;
+  if (pounds >= 100) return `£${pounds.toFixed(0)}`;
+  if (pounds >= 10) return `£${pounds.toFixed(2)}`;
+  return `£${pounds.toFixed(2)}`;
+}
+
+function formatPeriod(rows: number): string {
+  if (rows >= 24 * 360) return "year";
+  if (rows >= 24 * 28) return `${Math.round(rows / 24)} d`;
+  if (rows >= 24 * 5) return `${Math.round(rows / 24)} d`;
+  return `${rows} h`;
 }
 
 function findFirst(items: string[], pred: (s: string) => boolean): string | undefined {
