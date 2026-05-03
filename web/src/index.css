@@ -479,3 +479,16 @@ pre {
   padding: 0.35rem 0.7rem;
   font-size: 0.85rem;
 }
+
+.page__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  user-select: none;
+}
+
+.page__toggle input {
+  margin: 0;
+}

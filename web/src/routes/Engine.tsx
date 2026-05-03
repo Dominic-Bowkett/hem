@@ -44,6 +44,7 @@ export function Engine() {
   const [form, setForm] = useState<FormParams>(() => ({ ...archetype.defaults }));
 
   const [input, setInput] = useState("");
+  const [wholeYear, setWholeYear] = useState(false);
   const [run, setRun] = useState<RunState>({ kind: "idle" });
   const [history, setHistory] = useState<Run[]>([]);
   const [savedFor, setSavedFor] = useState<string | null>(null);
@@ -78,7 +79,10 @@ export function Engine() {
     try {
       const url = `${import.meta.env.BASE_URL}${archetype.templatePath}`;
       const template = await loadTemplate(url);
-      const next = archetype.applyForm(template, form);
+      const next = archetype.applyForm(template, form) as Record<string, unknown>;
+      if (wholeYear) {
+        next.SimulationTime = { start: 0, end: 8760, step: 1 };
+      }
       setInput(JSON.stringify(next, null, 2));
     } catch (err) {
       setRun({ kind: "error", message: `failed to build input: ${err}` });
@@ -233,6 +237,14 @@ export function Engine() {
         <button onClick={saveCurrentRun} disabled={!canSave}>
           {savedFor ? "Saved ✓" : "Save run"}
         </button>
+        <label className="page__toggle" title="When on, Build will overwrite SimulationTime to {start: 0, end: 8760, step: 1}.">
+          <input
+            type="checkbox"
+            checked={wholeYear}
+            onChange={(e) => setWholeYear(e.target.checked)}
+          />
+          <span>Whole year (8760 h, ~5–10 s)</span>
+        </label>
         <span className="page__status">
           {run.kind === "idle" && (ready ? "WASM ready." : "Loading WASM…")}
           {run.kind === "running" && "Running…"}
