@@ -4,14 +4,21 @@ import { deleteRun, listRuns, renameRun, saveRun, type Run } from "../lib/db";
 import { ARCHETYPES, DEFAULT_ARCHETYPE_ID, findArchetype } from "../lib/forms/registry";
 import type { FormParams } from "../lib/forms/types";
 import { loadTemplate } from "../lib/forms/template";
-import { summariseResults, type HemPayload, type ResultsSummary } from "../lib/results";
+import { summariseDetailed, summariseResults, type DetailedSummary, type HemPayload, type ResultsSummary } from "../lib/results";
 import { CaptureForm } from "../components/CaptureForm";
 import { ResultsSummaryView } from "../components/ResultsSummary";
 
 type RunState =
   | { kind: "idle" }
   | { kind: "running" }
-  | { kind: "ok"; ms: number; output: string; summary: ResultsSummary | null; payload: HemPayload }
+  | {
+      kind: "ok";
+      ms: number;
+      output: string;
+      summary: ResultsSummary | null;
+      detailed: DetailedSummary | null;
+      payload: HemPayload;
+    }
   | { kind: "error"; message: string };
 
 function timestamp(): string {
@@ -114,7 +121,15 @@ export function Engine() {
       const ms = Math.round(performance.now() - t0);
       const payload = result as HemPayload;
       const summary = summariseResults(payload);
-      setRun({ kind: "ok", ms, output: JSON.stringify(result, null, 2), summary, payload });
+      const detailed = summariseDetailed(payload);
+      setRun({
+        kind: "ok",
+        ms,
+        output: JSON.stringify(result, null, 2),
+        summary,
+        detailed,
+        payload,
+      });
     } catch (err) {
       const message = err instanceof Error ? (err.stack ?? err.message) : String(err);
       setRun({ kind: "error", message });
@@ -154,10 +169,12 @@ export function Engine() {
   function reload(target: Run) {
     setInput(target.inputJson);
     let summary: ResultsSummary | null = null;
+    let detailed: DetailedSummary | null = null;
     let payload: HemPayload | null = null;
     try {
       payload = JSON.parse(target.resultJson) as HemPayload;
       summary = summariseResults(payload);
+      detailed = summariseDetailed(payload);
     } catch {
       // older saved runs may have unparsable output; show raw text only
     }
@@ -167,6 +184,7 @@ export function Engine() {
         ms: target.runtimeMs,
         output: target.resultJson,
         summary,
+        detailed,
         payload,
       });
     } else {
@@ -253,7 +271,9 @@ export function Engine() {
         </span>
       </section>
 
-      {run.kind === "ok" && <ResultsSummaryView summary={run.summary} />}
+      {run.kind === "ok" && (
+        <ResultsSummaryView summary={run.summary} detailed={run.detailed} />
+      )}
 
       <section className="downloads">
         <button onClick={downloadInput} disabled={!input.trim()}>

@@ -1,10 +1,13 @@
-import type { ResultsSummary } from "../lib/results";
+import type { DetailedSummary, ResultsSummary } from "../lib/results";
+import { MonthlyBarsChart } from "./MonthlyBarsChart";
+import { TempBandChart } from "./TempBandChart";
 
 type Props = {
   summary: ResultsSummary | null;
+  detailed: DetailedSummary | null;
 };
 
-export function ResultsSummaryView({ summary }: Props) {
+export function ResultsSummaryView({ summary, detailed }: Props) {
   if (!summary) return null;
   if (summary.stats.length === 0) {
     return (
@@ -29,6 +32,12 @@ export function ResultsSummaryView({ summary }: Props) {
           </li>
         ))}
       </ul>
+      {detailed?.monthly && detailed.monthly.length > 1 && (
+        <MonthlyBarsChart data={detailed.monthly} />
+      )}
+      {detailed?.dailyTemp && detailed.dailyTemp.length > 1 && (
+        <TempBandChart data={detailed.dailyTemp} />
+      )}
     </div>
   );
 }

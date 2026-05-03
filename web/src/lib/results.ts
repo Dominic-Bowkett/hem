@@ -200,3 +200,133 @@ function splitCsvLine(line: string): string[] {
   // HEM doesn't quote fields, so a plain split is sufficient.
   return line.split(",");
 }
+
+export type MonthlyBucket = {
+  idx: number;          // 0..11
+  label: string;        // "Jan" .. "Dec"
+  hours: number;
+  gas: number;          // kWh
+  elec: number;         // kWh
+  heat: number;         // kWh
+};
+
+export type DailyTemp = {
+  day: number;          // day index from sim start
+  min: number;
+  max: number;
+  mean: number;
+};
+
+const DAYS_BEFORE_MONTH = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365];
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function monthOfHour(hourFromYearStart: number): number {
+  const day = Math.floor(hourFromYearStart / 24) % 365;
+  for (let m = 11; m >= 0; m--) if (day >= DAYS_BEFORE_MONTH[m]!) return m;
+  return 0;
+}
+
+export type DetailedSummary = {
+  rows: number;
+  monthly: MonthlyBucket[] | null;
+  dailyTemp: DailyTemp[] | null;
+};
+
+export function summariseDetailed(payload: HemPayload): DetailedSummary | null {
+  const csv = payload.files?.["results.csv"];
+  if (!csv) return null;
+  const { headers, rows } = parseCsv(csv);
+  const idxOf = (name: string): number => headers.indexOf(name);
+
+  const gasIdx = idxOf("mains gas: total");
+  const elecIdx = idxOf("mains elec: total");
+  const heatIdx = idxOf("zone 1: space heat demand");
+  const tempIdx = idxOf("zone 1: internal air temp");
+
+  // Monthly bars: only meaningful with at least 30 days of simulation
+  const monthly =
+    rows.length >= 24 * 30
+      ? bucketMonthly(rows, gasIdx, elecIdx, heatIdx, headers)
+      : null;
+
+  // Daily temp band: only meaningful with at least 7 days
+  const dailyTemp =
+    rows.length >= 24 * 7 && tempIdx >= 0 ? bucketDailyTemp(rows, tempIdx, headers) : null;
+
+  return { rows: rows.length, monthly, dailyTemp };
+}
+
+function bucketMonthly(
+  rows: Record<string, number | null>[],
+  gasIdx: number,
+  elecIdx: number,
+  heatIdx: number,
+  headers: string[],
+): MonthlyBucket[] {
+  const buckets: MonthlyBucket[] = MONTH_LABELS.map((label, idx) => ({
+    idx,
+    label,
+    hours: 0,
+    gas: 0,
+    elec: 0,
+    heat: 0,
+  }));
+  for (let h = 0; h < rows.length; h++) {
+    const row = rows[h]!;
+    const m = monthOfHour(h);
+    const bucket = buckets[m]!;
+    bucket.hours += 1;
+    if (gasIdx >= 0) bucket.gas += numAt(row, headers, gasIdx);
+    if (elecIdx >= 0) bucket.elec += numAt(row, headers, elecIdx);
+    if (heatIdx >= 0) bucket.heat += numAt(row, headers, heatIdx);
+  }
+  return buckets.filter((b) => b.hours > 0);
+}
+
+function bucketDailyTemp(
+  rows: Record<string, number | null>[],
+  tempIdx: number,
+  headers: string[],
+): DailyTemp[] {
+  const days: DailyTemp[] = [];
+  let day = -1;
+  let sum = 0;
+  let count = 0;
+  let mn = Infinity;
+  let mx = -Infinity;
+  const flush = () => {
+    if (day < 0 || count === 0) return;
+    days.push({ day, min: mn, max: mx, mean: sum / count });
+  };
+  for (let h = 0; h < rows.length; h++) {
+    const d = Math.floor(h / 24);
+    if (d !== day) {
+      flush();
+      day = d;
+      sum = 0;
+      count = 0;
+      mn = Infinity;
+      mx = -Infinity;
+    }
+    const v = numAt(rows[h]!, headers, tempIdx);
+    if (Number.isFinite(v)) {
+      sum += v;
+      count += 1;
+      if (v < mn) mn = v;
+      if (v > mx) mx = v;
+    }
+  }
+  flush();
+  return days;
+}
+
+function numAt(
+  row: Record<string, number | null>,
+  headers: string[],
+  idx: number,
+): number {
+  const key = headers[idx];
+  if (!key) return 0;
+  const v = row[key];
+  return typeof v === "number" ? v : 0;
+}
