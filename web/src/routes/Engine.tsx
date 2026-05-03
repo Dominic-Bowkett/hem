@@ -3,7 +3,7 @@ import { hemVersion, runHem } from "../lib/hem";
 import { deleteRun, listRuns, renameRun, saveRun, type Run } from "../lib/db";
 import { ARCHETYPES, DEFAULT_ARCHETYPE_ID, findArchetype } from "../lib/forms/registry";
 import type { FormParams } from "../lib/forms/types";
-import { getDemoTemplate } from "../lib/forms/template";
+import { loadTemplate } from "../lib/forms/template";
 import { CaptureForm } from "../components/CaptureForm";
 
 type RunState =
@@ -56,7 +56,8 @@ export function Engine() {
     setSavedFor(null);
     setRun({ kind: "idle" });
     try {
-      const template = await getDemoTemplate();
+      const url = `${import.meta.env.BASE_URL}${archetype.templatePath}`;
+      const template = await loadTemplate(url);
       const next = archetype.applyForm(template, form);
       setInput(JSON.stringify(next, null, 2));
     } catch (err) {
@@ -68,7 +69,8 @@ export function Engine() {
     setSavedFor(null);
     setRun({ kind: "idle" });
     try {
-      const template = await getDemoTemplate();
+      const url = `${import.meta.env.BASE_URL}${archetype.templatePath}`;
+      const template = await loadTemplate(url);
       setInput(JSON.stringify(template, null, 2));
     } catch (err) {
       setRun({ kind: "error", message: `failed to load example: ${err}` });

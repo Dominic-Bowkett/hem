@@ -4,24 +4,26 @@ use std::sync::{Arc, Mutex};
 use hem::output::Output;
 use hem::{run_project, ProjectFlags};
 
-const DEMO_INPUT: &str = include_str!("../../../../web/examples/demo_24hrs_august.json");
+const DEMO_INPUT: &str =
+    include_str!("../../../../web/public/examples/demo_24hrs_august.json");
+const MID_TERRACE_INPUT: &str =
+    include_str!("../../../../web/public/examples/mid_terrace_post_1990.json");
 
-#[test]
-fn engine_runs_demo_input_and_writes_results_csv() {
+fn run_and_check(label: &str, input: &str, required_columns: &[&str]) {
     let capture = CaptureOutput::default();
     let flags = ProjectFlags::empty();
     let response = run_project(
-        Cursor::new(DEMO_INPUT.as_bytes().to_vec()),
+        Cursor::new(input.as_bytes().to_vec()),
         &capture,
         None,
         None,
         &flags,
     )
-    .expect("HEM run should not error on a known-good input");
+    .unwrap_or_else(|e| panic!("{label}: HEM run should not error: {e:?}"));
 
     assert!(
         response.is_none(),
-        "Passthrough wrapper should not populate HemResponse; \
+        "{label}: Passthrough wrapper should not populate HemResponse; \
          if upstream changes this, decide whether to surface it via the wasm wrapper."
     );
 
@@ -30,20 +32,46 @@ fn engine_runs_demo_input_and_writes_results_csv() {
         .iter()
         .find(|(name, _)| name == "results.csv")
         .map(|(_, bytes)| bytes.clone())
-        .expect("engine must write a results.csv");
+        .unwrap_or_else(|| panic!("{label}: engine must write a results.csv"));
 
-    let header = String::from_utf8_lossy(&results[..results.iter().position(|&b| b == b'\n').unwrap_or(results.len())]);
-    for column in [
-        "Timestep",
-        "DHW: demand volume",
-        "zone 1: space heat demand",
-        "main: energy output",
-    ] {
+    let newline = results.iter().position(|&b| b == b'\n').unwrap_or(results.len());
+    let header = String::from_utf8_lossy(&results[..newline]);
+    for column in required_columns {
         assert!(
             header.contains(column),
-            "results.csv header missing column {column:?}; got:\n{header}"
+            "{label}: results.csv header missing column {column:?}; got:\n{header}"
         );
     }
+}
+
+#[test]
+fn engine_runs_demo_input() {
+    run_and_check(
+        "demo",
+        DEMO_INPUT,
+        &[
+            "Timestep",
+            "DHW: demand volume",
+            "zone 1: space heat demand",
+            "main: energy output",
+        ],
+    );
+}
+
+#[test]
+fn engine_runs_mid_terrace_template() {
+    run_and_check(
+        "mid_terrace",
+        MID_TERRACE_INPUT,
+        &[
+            "Timestep",
+            "DHW: demand volume",
+            "zone 1: space heat demand",
+            "main: energy output",
+            "mains gas: boiler_water_heating",
+            "mains gas: boiler_space_heating: main",
+        ],
+    );
 }
 
 #[derive(Debug, Default)]

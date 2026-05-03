@@ -16,6 +16,7 @@ export type ArchetypeDef = {
   id: string;
   name: string;
   description: string;
+  templatePath: string;
   defaults: FormParams;
   fields: FieldSpec[];
   applyForm: (template: HemInput, params: FormParams) => HemInput;

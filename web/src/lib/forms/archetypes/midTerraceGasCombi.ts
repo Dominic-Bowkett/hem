@@ -45,6 +45,7 @@ export const midTerraceGasCombi: ArchetypeDef = {
   name: "Mid-terrace, post-1990, gas combi",
   description:
     "Typical UK mid-terrace built between 1990 and 2002 with cavity wall insulation, double glazing, and a gas combi boiler. Defaults reflect Building Regulations of the period; tweak fields to match the actual property.",
+  templatePath: "examples/mid_terrace_post_1990.json",
   defaults: {
     floorArea: 80,
     ceilingHeight: 2.4,

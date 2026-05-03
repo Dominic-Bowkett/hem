@@ -30,6 +30,7 @@ export const demoParametric: ArchetypeDef = {
   name: "Demo (parametric)",
   description:
     "Five generic knobs over the engine's bundled demo input. Useful as a smoke-test of the form → engine loop, not a representation of any real dwelling.",
+  templatePath: "examples/demo_24hrs_august.json",
   defaults: {
     floorArea: 80,
     volume: 250,
