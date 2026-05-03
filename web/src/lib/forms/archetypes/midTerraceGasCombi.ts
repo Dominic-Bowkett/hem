@@ -7,6 +7,8 @@ type MidTerraceForm = {
   initialSetpoint: number;
   wallUValue: number;
   groundFloorUValue: number;
+  windowArea: number;
+  windowUValue: number;
   occupants: number;
 };
 
@@ -74,6 +76,8 @@ export const midTerraceGasCombi: ArchetypeDef = {
     initialSetpoint: 20,
     wallUValue: 0.45,
     groundFloorUValue: 0.45,
+    windowArea: 12,
+    windowUValue: 1.8,
     occupants: 2,
   },
   fields: [
@@ -132,6 +136,24 @@ export const midTerraceGasCombi: ArchetypeDef = {
       hint: "Insulated suspended floor ≈ 0.25; uninsulated solid concrete ≈ 1.4.",
     },
     {
+      key: "windowArea",
+      label: "Total window area",
+      unit: "m²",
+      step: 0.5,
+      min: 1,
+      max: 60,
+      hint: "Typical UK glazing ratio ≈ 12 % of floor area (so 9–12 m² for an 80 m² home).",
+    },
+    {
+      key: "windowUValue",
+      label: "Window U-value",
+      unit: "W/m²K",
+      step: 0.1,
+      min: 0.6,
+      max: 5,
+      hint: "Single glazing ≈ 4.8; 1990s double ≈ 2.8; modern low-E double ≈ 1.4; triple ≈ 1.0.",
+    },
+    {
       key: "occupants",
       label: "Number of occupants",
       unit: "people",
@@ -160,6 +182,31 @@ export const midTerraceGasCombi: ArchetypeDef = {
 
     const elements = zone.BuildingElement ?? {};
     const wallR = uValueToRConstruction(params.wallUValue);
+    const winR = uValueToRConstruction(params.windowUValue);
+
+    // Resize the (single) transparent element to match form's windowArea,
+    // keeping the existing height proportions and shape sensible.
+    let glazingOnFace: { orient: number; area: number } | null = null;
+    for (const [name, el] of Object.entries(elements)) {
+      if (!el || typeof el !== "object") continue;
+      if (
+        name.startsWith("window ") &&
+        el.type === "BuildingElementTransparent" &&
+        el.pitch === 90
+      ) {
+        const orient = el.orientation360 ?? 0;
+        const targetArea = Math.max(0.5, params.windowArea);
+        // Make the window 1.4 m tall (typical UK), width = area / height.
+        const winHeight = 1.4;
+        const winWidth = round(targetArea / winHeight);
+        el.height = winHeight;
+        el.width = winWidth;
+        // Note: BuildingElementTransparent computes area from height × width;
+        // setting "area" explicitly fails schema validation.
+        el.thermal_resistance_construction = round(winR, 3);
+        glazingOnFace = { orient, area: round(winHeight * winWidth) };
+      }
+    }
 
     for (const [name, el] of Object.entries(elements)) {
       if (!el || typeof el !== "object") continue;
@@ -173,9 +220,15 @@ export const midTerraceGasCombi: ArchetypeDef = {
         // template doesn't carve out adjacent-zone party walls cleanly.
         const isFrontBack = orient === 0 || orient === 180;
         const faceWidth = isFrontBack ? frontWidth : depth;
+        const grossArea = faceWidth * totalHeight;
+        // If glazing sits on this facade, subtract its area so the envelope is
+        // consistent (HEM treats wall + window as additive heat-loss surfaces).
+        const subtract =
+          glazingOnFace && glazingOnFace.orient === orient ? glazingOnFace.area : 0;
+        const netArea = Math.max(1, grossArea - subtract);
         el.height = totalHeight;
         el.width = faceWidth;
-        el.area = round(faceWidth * totalHeight);
+        el.area = round(netArea);
         el.thermal_resistance_construction = round(wallR, 3);
       }
 
