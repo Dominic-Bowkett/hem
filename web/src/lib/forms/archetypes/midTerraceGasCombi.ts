@@ -32,11 +32,19 @@ type InternalGainsShape = {
   "metabolic gains"?: { schedule?: { main?: number[] } };
 };
 
+type ScheduleEntry = number | boolean | null | { value: unknown; repeat?: number };
+type ControlShape = {
+  schedule?: { main?: ScheduleEntry[] };
+};
+
 type Input = {
   Zone?: { "zone 1"?: ZoneShape };
   InternalGains?: InternalGainsShape;
+  Control?: Record<string, ControlShape>;
   [k: string]: unknown;
 };
+
+const SETPOINT_CONTROL_KEY = "main__space heat timer__converted_from_OnOffTimeControl";
 
 const SURFACE_R = 0.17;
 const BASELINE_OCCUPANTS = 2;
@@ -184,6 +192,19 @@ export const midTerraceGasCombi: ArchetypeDef = {
     if (baseline && scaled) {
       const factor = params.occupants / BASELINE_OCCUPANTS;
       scaled.main = baseline.map((v) => Math.round(v * factor));
+    }
+
+    // Heating setpoint: rewrite every numeric entry in the setpoint schedule to
+    // the user's target. Null/false entries (heating off) are left alone, so the
+    // SAP morning + evening on/off pattern is preserved.
+    const setpointSchedule = next.Control?.[SETPOINT_CONTROL_KEY]?.schedule?.main;
+    if (Array.isArray(setpointSchedule)) {
+      for (let i = 0; i < setpointSchedule.length; i++) {
+        const v = setpointSchedule[i];
+        if (typeof v === "number") {
+          setpointSchedule[i] = params.initialSetpoint;
+        }
+      }
     }
 
     return next as HemInput;
