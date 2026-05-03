@@ -1,12 +1,13 @@
-import { FIELDS, type ParametricForm } from "../lib/forms/parametricDemo";
+import type { ArchetypeDef, FormParams } from "../lib/forms/types";
 
 type Props = {
-  value: ParametricForm;
-  onChange: (next: ParametricForm) => void;
+  archetype: ArchetypeDef;
+  value: FormParams;
+  onChange: (next: FormParams) => void;
 };
 
-export function CaptureForm({ value, onChange }: Props) {
-  function update<K extends keyof ParametricForm>(key: K, raw: string) {
+export function CaptureForm({ archetype, value, onChange }: Props) {
+  function update(key: string, raw: string) {
     const num = Number(raw);
     if (Number.isFinite(num)) {
       onChange({ ...value, [key]: num });
@@ -15,9 +16,12 @@ export function CaptureForm({ value, onChange }: Props) {
 
   return (
     <div className="capture">
-      <h2 className="capture__title">Capture</h2>
+      <div className="capture__head">
+        <h2 className="capture__title">{archetype.name}</h2>
+        <p className="capture__desc">{archetype.description}</p>
+      </div>
       <div className="capture__grid">
-        {FIELDS.map((f) => (
+        {archetype.fields.map((f) => (
           <label key={f.key} className="capture__field">
             <span className="capture__label">
               {f.label} <span className="capture__unit">({f.unit})</span>
@@ -28,7 +32,7 @@ export function CaptureForm({ value, onChange }: Props) {
               step={f.step}
               min={f.min}
               max={f.max}
-              value={value[f.key]}
+              value={value[f.key] ?? 0}
               onChange={(e) => update(f.key, e.target.value)}
             />
             <span className="capture__hint">{f.hint}</span>

@@ -1,5 +1,4 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
-import type { ParametricForm } from "./forms/parametricDemo";
 
 export type Run = {
   id: string;
@@ -8,7 +7,8 @@ export type Run = {
   resultJson: string;
   runtimeMs: number;
   createdAt: number;
-  formParams?: ParametricForm;
+  archetypeId?: string;
+  formParams?: Record<string, number>;
 };
 
 interface HemDB extends DBSchema {
@@ -20,7 +20,7 @@ interface HemDB extends DBSchema {
 }
 
 const DB_NAME = "hem";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 let dbPromise: Promise<IDBPDatabase<HemDB>> | null = null;
 
@@ -52,7 +52,8 @@ export async function saveRun(args: {
   resultJson: string;
   runtimeMs: number;
   name?: string;
-  formParams?: ParametricForm;
+  archetypeId?: string;
+  formParams?: Record<string, number>;
 }): Promise<Run> {
   const db = await getDb();
   const now = new Date();
@@ -63,6 +64,7 @@ export async function saveRun(args: {
     resultJson: args.resultJson,
     runtimeMs: args.runtimeMs,
     createdAt: now.getTime(),
+    archetypeId: args.archetypeId,
     formParams: args.formParams,
   };
   await db.put("runs", run);

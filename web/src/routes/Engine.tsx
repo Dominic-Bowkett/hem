@@ -1,11 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { hemVersion, runHem } from "../lib/hem";
 import { deleteRun, listRuns, renameRun, saveRun, type Run } from "../lib/db";
-import {
-  applyForm,
-  DEFAULT_FORM,
-  type ParametricForm,
-} from "../lib/forms/parametricDemo";
+import { ARCHETYPES, DEFAULT_ARCHETYPE_ID, findArchetype } from "../lib/forms/registry";
+import type { FormParams } from "../lib/forms/types";
 import { getDemoTemplate } from "../lib/forms/template";
 import { CaptureForm } from "../components/CaptureForm";
 
@@ -19,7 +16,13 @@ export function Engine() {
   const [version, setVersion] = useState<string | null>(null);
   const [versionError, setVersionError] = useState<string | null>(null);
 
-  const [form, setForm] = useState<ParametricForm>(DEFAULT_FORM);
+  const [archetypeId, setArchetypeId] = useState<string>(DEFAULT_ARCHETYPE_ID);
+  const archetype = useMemo(
+    () => findArchetype(archetypeId) ?? ARCHETYPES[0]!,
+    [archetypeId],
+  );
+  const [form, setForm] = useState<FormParams>(() => ({ ...archetype.defaults }));
+
   const [input, setInput] = useState("");
   const [run, setRun] = useState<RunState>({ kind: "idle" });
   const [history, setHistory] = useState<Run[]>([]);
@@ -39,12 +42,22 @@ export function Engine() {
     setHistory(await listRuns());
   }
 
+  function pickArchetype(id: string) {
+    const a = findArchetype(id);
+    if (!a) return;
+    setArchetypeId(id);
+    setForm({ ...a.defaults });
+    setInput("");
+    setRun({ kind: "idle" });
+    setSavedFor(null);
+  }
+
   async function buildFromForm() {
     setSavedFor(null);
     setRun({ kind: "idle" });
     try {
       const template = await getDemoTemplate();
-      const next = applyForm(template, form);
+      const next = archetype.applyForm(template, form);
       setInput(JSON.stringify(next, null, 2));
     } catch (err) {
       setRun({ kind: "error", message: `failed to build input: ${err}` });
@@ -86,6 +99,7 @@ export function Engine() {
       inputJson: input,
       resultJson: run.output,
       runtimeMs: run.ms,
+      archetypeId: archetype.id,
       formParams: form,
     });
     setSavedFor(stored.id);
@@ -96,7 +110,17 @@ export function Engine() {
     setInput(target.inputJson);
     setRun({ kind: "ok", ms: target.runtimeMs, output: target.resultJson });
     setSavedFor(target.id);
-    if (target.formParams) setForm(target.formParams);
+    if (target.archetypeId) {
+      const a = findArchetype(target.archetypeId);
+      if (a) {
+        setArchetypeId(a.id);
+        setForm({ ...a.defaults, ...(target.formParams ?? {}) });
+        return;
+      }
+    }
+    if (target.formParams) {
+      setForm((prev) => ({ ...prev, ...target.formParams }));
+    }
   }
 
   async function rename(target: Run) {
@@ -126,11 +150,24 @@ export function Engine() {
         )}
       </p>
 
-      <CaptureForm value={form} onChange={setForm} />
+      <section className="archetype-picker">
+        <label>
+          <span>Archetype</span>
+          <select value={archetypeId} onChange={(e) => pickArchetype(e.target.value)}>
+            {ARCHETYPES.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </section>
+
+      <CaptureForm archetype={archetype} value={form} onChange={setForm} />
 
       <section className="page__controls">
         <button onClick={buildFromForm}>Build input from form</button>
-        <button onClick={loadRawExample}>Load example as-is</button>
+        <button onClick={loadRawExample}>Load template as-is</button>
         <button onClick={runEngine} disabled={!ready || run.kind === "running"}>
           {run.kind === "running" ? "Running…" : "Run engine"}
         </button>
@@ -176,23 +213,26 @@ export function Engine() {
           </p>
         ) : (
           <ul className="history__list">
-            {history.map((r) => (
-              <li key={r.id} className="history__item">
-                <div className="history__main">
-                  <button className="history__name" onClick={() => reload(r)}>
-                    {r.name}
-                  </button>
-                  <span className="history__meta">
-                    {new Date(r.createdAt).toLocaleString()} · {r.runtimeMs} ms
-                    {r.formParams && " · from form"}
-                  </span>
-                </div>
-                <div className="history__actions">
-                  <button onClick={() => rename(r)}>Rename</button>
-                  <button onClick={() => remove(r)}>Delete</button>
-                </div>
-              </li>
-            ))}
+            {history.map((r) => {
+              const a = r.archetypeId ? findArchetype(r.archetypeId) : undefined;
+              return (
+                <li key={r.id} className="history__item">
+                  <div className="history__main">
+                    <button className="history__name" onClick={() => reload(r)}>
+                      {r.name}
+                    </button>
+                    <span className="history__meta">
+                      {new Date(r.createdAt).toLocaleString()} · {r.runtimeMs} ms
+                      {a && ` · ${a.name}`}
+                    </span>
+                  </div>
+                  <div className="history__actions">
+                    <button onClick={() => rename(r)}>Rename</button>
+                    <button onClick={() => remove(r)}>Delete</button>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
