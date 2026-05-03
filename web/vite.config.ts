@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["icon.svg", "examples/*.json"],
+      includeAssets: ["icon.svg", "examples/*.json", "weather/*.epw"],
       manifest: {
         name: "HEM Field Assessment Tool",
         short_name: "HEM",
@@ -30,7 +30,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,wasm,json,svg}"],
+        globPatterns: ["**/*.{js,css,html,wasm,json,svg,epw}"],
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
         navigateFallback: "/hem/index.html",
         navigateFallbackDenylist: [/^\/hem\/wasm\//],

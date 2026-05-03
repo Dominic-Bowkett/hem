@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { hemVersion, runHem } from "../lib/hem";
+import { hemVersion, runHem, runHemWithEpw } from "../lib/hem";
 import { deleteRun, listRuns, renameRun, saveRun, type Run } from "../lib/db";
 import { ARCHETYPES, DEFAULT_ARCHETYPE_ID, findArchetype } from "../lib/forms/registry";
 import type { FormParams } from "../lib/forms/types";
@@ -9,7 +9,9 @@ import { CaptureForm } from "../components/CaptureForm";
 import { ResultsSummaryView } from "../components/ResultsSummary";
 import { Compare } from "../components/Compare";
 import { TariffSettings } from "../components/TariffSettings";
+import { WeatherPicker } from "../components/WeatherPicker";
 import { loadTariff, saveTariff, type Tariff } from "../lib/tariff";
+import { fetchBundledEpw, stripWeatherArrays, type WeatherSource } from "../lib/weather";
 
 type RunState =
   | { kind: "idle" }
@@ -60,6 +62,7 @@ export function Engine() {
   const [savedFor, setSavedFor] = useState<string | null>(null);
   const [compareIds, setCompareIds] = useState<Set<string>>(new Set());
   const [tariff, setTariffState] = useState<Tariff>(() => loadTariff());
+  const [weather, setWeather] = useState<WeatherSource>({ kind: "template" });
 
   function setTariff(next: Tariff) {
     setTariffState(next);
@@ -133,18 +136,28 @@ export function Engine() {
     setRun({ kind: "running" });
     const t0 = performance.now();
     try {
-      const result = await runHem(input);
+      let result: HemPayload;
+      if (weather.kind === "template") {
+        result = await runHem(input);
+      } else {
+        const epwText =
+          weather.kind === "bundled" ? await fetchBundledEpw() : weather.text;
+        // Strip the in-template ExternalConditions arrays so the EPW is the
+        // unambiguous source of weather. Keeps lat/long/shading from the JSON.
+        const inputObj = JSON.parse(input) as Record<string, unknown>;
+        const stripped = stripWeatherArrays(inputObj);
+        result = await runHemWithEpw(JSON.stringify(stripped), epwText);
+      }
       const ms = Math.round(performance.now() - t0);
-      const payload = result as HemPayload;
-      const summary = summariseResults(payload, tariff);
-      const detailed = summariseDetailed(payload);
+      const summary = summariseResults(result, tariff);
+      const detailed = summariseDetailed(result);
       setRun({
         kind: "ok",
         ms,
         output: JSON.stringify(result, null, 2),
         summary,
         detailed,
-        payload,
+        payload: result,
       });
     } catch (err) {
       const message = err instanceof Error ? (err.stack ?? err.message) : String(err);
@@ -294,6 +307,7 @@ export function Engine() {
       <CaptureForm archetype={archetype} value={form} onChange={setForm} />
 
       <TariffSettings value={tariff} onChange={setTariff} />
+      <WeatherPicker value={weather} onChange={setWeather} />
 
       <section className="page__controls">
         <button onClick={buildFromForm}>Build input from form</button>
