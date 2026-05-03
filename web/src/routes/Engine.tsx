@@ -4,13 +4,33 @@ import { deleteRun, listRuns, renameRun, saveRun, type Run } from "../lib/db";
 import { ARCHETYPES, DEFAULT_ARCHETYPE_ID, findArchetype } from "../lib/forms/registry";
 import type { FormParams } from "../lib/forms/types";
 import { loadTemplate } from "../lib/forms/template";
+import { summariseResults, type HemPayload, type ResultsSummary } from "../lib/results";
 import { CaptureForm } from "../components/CaptureForm";
+import { ResultsSummaryView } from "../components/ResultsSummary";
 
 type RunState =
   | { kind: "idle" }
   | { kind: "running" }
-  | { kind: "ok"; ms: number; output: string }
+  | { kind: "ok"; ms: number; output: string; summary: ResultsSummary | null; payload: HemPayload }
   | { kind: "error"; message: string };
+
+function timestamp(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+}
+
+function downloadBlob(filename: string, mime: string, content: string) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
 
 export function Engine() {
   const [version, setVersion] = useState<string | null>(null);
@@ -88,11 +108,30 @@ export function Engine() {
     try {
       const result = await runHem(input);
       const ms = Math.round(performance.now() - t0);
-      setRun({ kind: "ok", ms, output: JSON.stringify(result, null, 2) });
+      const payload = result as HemPayload;
+      const summary = summariseResults(payload);
+      setRun({ kind: "ok", ms, output: JSON.stringify(result, null, 2), summary, payload });
     } catch (err) {
       const message = err instanceof Error ? (err.stack ?? err.message) : String(err);
       setRun({ kind: "error", message });
     }
+  }
+
+  function downloadCsv() {
+    if (run.kind !== "ok") return;
+    const csv = run.payload.files?.["results.csv"];
+    if (!csv) return;
+    downloadBlob(`hem-results-${timestamp()}.csv`, "text/csv", csv);
+  }
+
+  function downloadJson() {
+    if (run.kind !== "ok") return;
+    downloadBlob(`hem-output-${timestamp()}.json`, "application/json", run.output);
+  }
+
+  function downloadInput() {
+    if (!input.trim()) return;
+    downloadBlob(`hem-input-${timestamp()}.json`, "application/json", input);
   }
 
   async function saveCurrentRun() {
@@ -110,7 +149,25 @@ export function Engine() {
 
   function reload(target: Run) {
     setInput(target.inputJson);
-    setRun({ kind: "ok", ms: target.runtimeMs, output: target.resultJson });
+    let summary: ResultsSummary | null = null;
+    let payload: HemPayload | null = null;
+    try {
+      payload = JSON.parse(target.resultJson) as HemPayload;
+      summary = summariseResults(payload);
+    } catch {
+      // older saved runs may have unparsable output; show raw text only
+    }
+    if (payload) {
+      setRun({
+        kind: "ok",
+        ms: target.runtimeMs,
+        output: target.resultJson,
+        summary,
+        payload,
+      });
+    } else {
+      setRun({ kind: "error", message: "saved output is not valid JSON; raw text:\n" + target.resultJson });
+    }
     setSavedFor(target.id);
     if (target.archetypeId) {
       const a = findArchetype(target.archetypeId);
@@ -184,6 +241,20 @@ export function Engine() {
         </span>
       </section>
 
+      {run.kind === "ok" && <ResultsSummaryView summary={run.summary} />}
+
+      <section className="downloads">
+        <button onClick={downloadInput} disabled={!input.trim()}>
+          Download input JSON
+        </button>
+        <button onClick={downloadCsv} disabled={run.kind !== "ok"}>
+          Download results.csv
+        </button>
+        <button onClick={downloadJson} disabled={run.kind !== "ok"}>
+          Download full output JSON
+        </button>
+      </section>
+
       <section className="page__io">
         <div className="page__col">
           <label htmlFor="input">Input JSON</label>
@@ -196,7 +267,7 @@ export function Engine() {
           />
         </div>
         <div className="page__col">
-          <label htmlFor="output">Output</label>
+          <label htmlFor="output">Output (raw)</label>
           <pre id="output">
             {run.kind === "ok"
               ? run.output
