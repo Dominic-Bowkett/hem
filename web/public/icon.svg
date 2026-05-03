@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#1f6feb"/>
+  <path d="M120 392V200l136-104 136 104v192h-88V296H208v96z"
+        fill="#ffffff" stroke="#ffffff" stroke-width="8" stroke-linejoin="round"/>
+  <text x="256" y="476" text-anchor="middle"
+        font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
+        font-size="56" font-weight="700" fill="#ffffff" letter-spacing="6">HEM</text>
+</svg>
