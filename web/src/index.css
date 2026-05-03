@@ -304,6 +304,81 @@ pre {
   color: var(--muted);
 }
 
+.tariff {
+  margin: 0 0 1rem 0;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(120, 120, 120, 0.04);
+}
+
+.tariff__summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+
+.tariff__current {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.tariff__edited {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.tariff__body {
+  margin-top: 0.7rem;
+}
+
+.tariff__hint {
+  margin: 0 0 0.6rem 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.tariff__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.6rem;
+}
+
+.tariff__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+}
+
+.tariff__unit {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.tariff__field input {
+  font: inherit;
+  padding: 0.35rem 0.5rem;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: Canvas;
+  color: CanvasText;
+}
+
+.tariff__actions {
+  margin-top: 0.7rem;
+}
+
+.tariff__actions button {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.85rem;
+}
+
 .archetype-picker {
   margin: 0.5rem 0 1rem 0;
 }

@@ -7,11 +7,13 @@ import {
   type ResultStat,
 } from "../lib/results";
 import { findArchetype } from "../lib/forms/registry";
+import type { Tariff } from "../lib/tariff";
 import { MonthlyBarsChart } from "./MonthlyBarsChart";
 
 type Props = {
   a: Run;
   b: Run;
+  tariff: Tariff;
   onClear: () => void;
 };
 
@@ -35,9 +37,9 @@ const HIGHER_IS_WORSE = new Set([
   "Unmet-demand hours",
 ]);
 
-export function Compare({ a, b, onClear }: Props) {
-  const summaryA = useMemo(() => summarise(a), [a]);
-  const summaryB = useMemo(() => summarise(b), [b]);
+export function Compare({ a, b, tariff, onClear }: Props) {
+  const summaryA = useMemo(() => summarise(a, tariff), [a, tariff]);
+  const summaryB = useMemo(() => summarise(b, tariff), [b, tariff]);
   const monthlyA = useMemo(() => detailed(a)?.monthly ?? null, [a]);
   const monthlyB = useMemo(() => detailed(b)?.monthly ?? null, [b]);
 
@@ -103,10 +105,10 @@ export function Compare({ a, b, onClear }: Props) {
   );
 }
 
-function summarise(run: Run): ResultStat[] {
+function summarise(run: Run, tariff: Tariff): ResultStat[] {
   try {
     const payload = JSON.parse(run.resultJson) as HemPayload;
-    return summariseResults(payload)?.stats ?? [];
+    return summariseResults(payload, tariff)?.stats ?? [];
   } catch {
     return [];
   }

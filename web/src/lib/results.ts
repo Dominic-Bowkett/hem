@@ -1,3 +1,5 @@
+import { DEFAULT_TARIFF, type Tariff } from "./tariff";
+
 export type HemPayload = {
   hem_version: string;
   response: unknown;
@@ -17,7 +19,10 @@ export type ResultsSummary = {
 
 type Row = Record<string, number | null>;
 
-export function summariseResults(payload: HemPayload): ResultsSummary | null {
+export function summariseResults(
+  payload: HemPayload,
+  tariff: Tariff = DEFAULT_TARIFF,
+): ResultsSummary | null {
   const csv = payload.files?.["results.csv"];
   if (!csv) return null;
 
@@ -61,7 +66,7 @@ export function summariseResults(payload: HemPayload): ResultsSummary | null {
     "°C",
   );
   pushUnmetHours(stats, rows, headers, "_unmet_demand: zone 1");
-  pushCost(stats, rows, headers);
+  pushCost(stats, rows, headers, tariff);
 
   return { rows: rows.length, stats };
 }
@@ -164,18 +169,11 @@ function pushUnmetHours(
 }
 
 // Ofgem default tariff cap (April 2025, England average dual fuel direct-debit
-// and roughly representative; standing charges vary by region). Hard-coded for
-// the spike — a settings panel for unit + standing charges is the obvious
-// follow-up. All values are pence so we keep integer arithmetic until the
-// final pound conversion.
-const TARIFF = {
-  gasUnit_p_per_kWh: 6.34,
-  gasStanding_p_per_day: 32,
-  elecUnit_p_per_kWh: 27.03,
-  elecStanding_p_per_day: 53.8,
-};
+// and roughly representative; standing charges vary by region). Now also
+// configurable per-user via the Tariff settings panel; the value passed in
+// to summariseResults wins if present.
 
-function pushCost(out: ResultStat[], rows: Row[], headers: string[]) {
+function pushCost(out: ResultStat[], rows: Row[], headers: string[], tariff: Tariff) {
   const gasIdx = "mains gas: total";
   const elecIdx = "mains elec: total";
   const hasGas = headers.includes(gasIdx);
@@ -196,18 +194,18 @@ function pushCost(out: ResultStat[], rows: Row[], headers: string[]) {
   }
 
   const days = Math.max(1, rows.length / 24);
-  const gasCostP = gasKwh * TARIFF.gasUnit_p_per_kWh + days * TARIFF.gasStanding_p_per_day;
+  const gasCostP = gasKwh * tariff.gasUnit_p_per_kWh + days * tariff.gasStanding_p_per_day;
   const elecCostP =
-    elecKwh * TARIFF.elecUnit_p_per_kWh + days * TARIFF.elecStanding_p_per_day;
+    elecKwh * tariff.elecUnit_p_per_kWh + days * tariff.elecStanding_p_per_day;
   const totalCostP = (hasGas ? gasCostP : 0) + (hasElec ? elecCostP : 0);
 
   const periodLabel = formatPeriod(rows.length);
   const hint =
-    `Tariff: gas ${TARIFF.gasUnit_p_per_kWh.toFixed(2)} p/kWh + ` +
-    `${TARIFF.gasStanding_p_per_day.toFixed(0)} p/day standing; elec ` +
-    `${TARIFF.elecUnit_p_per_kWh.toFixed(2)} p/kWh + ` +
-    `${TARIFF.elecStanding_p_per_day.toFixed(1)} p/day standing. ` +
-    `Hard-coded Ofgem cap (Apr 2025); not a quote.`;
+    `Tariff: gas ${tariff.gasUnit_p_per_kWh.toFixed(2)} p/kWh + ` +
+    `${tariff.gasStanding_p_per_day.toFixed(0)} p/day standing; elec ` +
+    `${tariff.elecUnit_p_per_kWh.toFixed(2)} p/kWh + ` +
+    `${tariff.elecStanding_p_per_day.toFixed(1)} p/day standing. ` +
+    `Editable in Tariff settings; not a quote.`;
 
   if (hasGas && hasElec) {
     out.push({
@@ -218,12 +216,12 @@ function pushCost(out: ResultStat[], rows: Row[], headers: string[]) {
     out.push({
       label: `Gas cost`,
       value: formatPounds(gasCostP),
-      hint: `${gasKwh.toFixed(0)} kWh × ${TARIFF.gasUnit_p_per_kWh} p + ${days.toFixed(0)} days × ${TARIFF.gasStanding_p_per_day} p standing.`,
+      hint: `${gasKwh.toFixed(0)} kWh × ${tariff.gasUnit_p_per_kWh} p + ${days.toFixed(0)} days × ${tariff.gasStanding_p_per_day} p standing.`,
     });
     out.push({
       label: `Elec cost`,
       value: formatPounds(elecCostP),
-      hint: `${elecKwh.toFixed(0)} kWh × ${TARIFF.elecUnit_p_per_kWh} p + ${days.toFixed(0)} days × ${TARIFF.elecStanding_p_per_day} p standing.`,
+      hint: `${elecKwh.toFixed(0)} kWh × ${tariff.elecUnit_p_per_kWh} p + ${days.toFixed(0)} days × ${tariff.elecStanding_p_per_day} p standing.`,
     });
   } else if (hasGas) {
     out.push({ label: `Gas cost (${periodLabel})`, value: formatPounds(gasCostP), hint });
@@ -317,7 +315,13 @@ export type DetailedSummary = {
   dailyTemp: DailyTemp[] | null;
 };
 
-export function summariseDetailed(payload: HemPayload): DetailedSummary | null {
+export function summariseDetailed(
+  payload: HemPayload,
+  tariff: Tariff = DEFAULT_TARIFF,
+): DetailedSummary | null {
+  // tariff is accepted for API symmetry with summariseResults so callers can
+  // pass the same value to both; not currently used in the detailed view.
+  void tariff;
   const csv = payload.files?.["results.csv"];
   if (!csv) return null;
   const { headers, rows } = parseCsv(csv);

@@ -8,6 +8,8 @@ import { summariseDetailed, summariseResults, type DetailedSummary, type HemPayl
 import { CaptureForm } from "../components/CaptureForm";
 import { ResultsSummaryView } from "../components/ResultsSummary";
 import { Compare } from "../components/Compare";
+import { TariffSettings } from "../components/TariffSettings";
+import { loadTariff, saveTariff, type Tariff } from "../lib/tariff";
 
 type RunState =
   | { kind: "idle" }
@@ -57,6 +59,18 @@ export function Engine() {
   const [history, setHistory] = useState<Run[]>([]);
   const [savedFor, setSavedFor] = useState<string | null>(null);
   const [compareIds, setCompareIds] = useState<Set<string>>(new Set());
+  const [tariff, setTariffState] = useState<Tariff>(() => loadTariff());
+
+  function setTariff(next: Tariff) {
+    setTariffState(next);
+    saveTariff(next);
+    // Re-run the summariser on the current run so cost cards refresh live
+    setRun((prev) => {
+      if (prev.kind !== "ok") return prev;
+      const summary = summariseResults(prev.payload, next);
+      return { ...prev, summary };
+    });
+  }
 
   useEffect(() => {
     hemVersion()
@@ -122,7 +136,7 @@ export function Engine() {
       const result = await runHem(input);
       const ms = Math.round(performance.now() - t0);
       const payload = result as HemPayload;
-      const summary = summariseResults(payload);
+      const summary = summariseResults(payload, tariff);
       const detailed = summariseDetailed(payload);
       setRun({
         kind: "ok",
@@ -175,7 +189,7 @@ export function Engine() {
     let payload: HemPayload | null = null;
     try {
       payload = JSON.parse(target.resultJson) as HemPayload;
-      summary = summariseResults(payload);
+      summary = summariseResults(payload, tariff);
       detailed = summariseDetailed(payload);
     } catch {
       // older saved runs may have unparsable output; show raw text only
@@ -278,6 +292,8 @@ export function Engine() {
       </section>
 
       <CaptureForm archetype={archetype} value={form} onChange={setForm} />
+
+      <TariffSettings value={tariff} onChange={setTariff} />
 
       <section className="page__controls">
         <button onClick={buildFromForm}>Build input from form</button>
@@ -390,7 +406,12 @@ export function Engine() {
       </section>
 
       {comparePair && (
-        <Compare a={comparePair[0]} b={comparePair[1]} onClear={() => setCompareIds(new Set())} />
+        <Compare
+          a={comparePair[0]}
+          b={comparePair[1]}
+          tariff={tariff}
+          onClear={() => setCompareIds(new Set())}
+        />
       )}
     </>
   );
